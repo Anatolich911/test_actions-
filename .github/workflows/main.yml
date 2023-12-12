@@ -3,15 +3,26 @@ name: Build and Deploy to AWS Elastic Beanstalk
 on:
   push:
     branches:
-      - main # Set the branch here
+      - main # Set the branch you want to trigger the action on
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v2
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1 # Replace with your AWS region
+
+    - name: Checkout AWS CodeCommit Repository
+      run: |
+        git config --global credential.helper '!aws codecommit credential-helper $@'
+        git config --global credential.UseHttpPath true
+        git clone https://git-codecommit.us-east-1.amazonaws.com/v1/repos/sd
+        cd sd
 
     - name: Set up JDK 11
       uses: actions/setup-java@v2
@@ -31,19 +42,13 @@ jobs:
     - name: Build with Maven
       run: mvn clean package -Dartifact-version=$VERSION_LABEL
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
 
     - name: Upload artifact to S3
       run: |
-        aws s3 cp ${{ github.workspace }}/target/SARTIFACT s3://elasticbeanstalk-us-east-1-xxxxxxxxxxxx/${{ env.APPLICATION_NAME }}/
+        aws s3 cp ${{ github.workspace }}/target/SARTIFACT s3://terraform-s3backend-anatolich911/${{ env.APPLICATION_NAME }}/
 
-    - name: Create Beanstalk Application Version
-      run: |
-        aws elasticbeanstalk create-application-version --application-name $APPLICATION_NAME --version-label $VERSION_LABEL --source-bundle S3Bucket=elasticbeanstalk-us-east-1-xxxxxxxxxxxx,S3Key=${{ env.APPLICATION_NAME }}/$ARTIFACT
+   # - name: Create Beanstalk Application Version
+   #   run: |
+   #     aws elasticbeanstalk create-application-version --application-name $APPLICATION_NAME --version-label $VERSION_LABEL --source-bundle S3Bucket=terraform-s3backend-anatolich911,S3Key=${{ env.APPLICATION_NAME }}/$ARTIFACT
 
     
