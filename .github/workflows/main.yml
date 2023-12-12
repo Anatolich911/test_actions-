@@ -30,25 +30,33 @@ jobs:
         java-version: '11'
         distribution: 'adopt'
 
-    - name: Extract project version
-      run: echo "VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_ENV
-
-    - name: Generate timestamp
-      run: echo "TIMESTAMP=$(date +'%Y-%m-%d-%H.%M.%S')" >> $GITHUB_ENV
-
-    - name: Set Version Label
-      run: echo "VERSION_LABEL=$VERSION-$TIMESTAMP" >> $GITHUB_ENV
+    - name: Extract project version and set environment variables
+      run: |
+        VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        TIMESTAMP=$(date +'%Y-%m-%d-%H.%M.%S')
+        VERSION_LABEL="$VERSION-$TIMESTAMP"
+        ARTIFACT="$VERSION_LABEL.war"
+        APPLICATION_NAME="media-ws" 
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
+        echo "VERSION_LABEL=$VERSION_LABEL" >> $GITHUB_ENV
+        echo "ARTIFACT=$ARTIFACT" >> $GITHUB_ENV
+        echo "APPLICATION_NAME=$APPLICATION_NAME" >> $GITHUB_ENV
 
     #- name: Build with Maven
-    #  run: mvn clean package -Dartifact-version=$VERSION_LABEL
+    #  run: mvn clean package -Dartifact-mvt -Dversion.label=$VERSION_LABEL -P code-artifact-mvt
 
 
     - name: Upload artifact to S3
-      run: |
-        aws s3 cp ${{ github.workspace }}/target/SARTIFACT s3://terraform-s3backend-anatolich911/${{ env.APPLICATION_NAME }}/
+      run: aws s3 cp target/$ARTIFACT s3://terraform-s3backend-anatolich911/$APPLICATION_NAME/
 
-   # - name: Create Beanstalk Application Version
-   #   run: |
-   #     aws elasticbeanstalk create-application-version --application-name $APPLICATION_NAME --version-label $VERSION_LABEL --source-bundle S3Bucket=terraform-s3backend-anatolich911,S3Key=${{ env.APPLICATION_NAME }}/$ARTIFACT
+    #- name: Create Beanstalk Application Version
+    #  run: aws elasticbeanstalk create-application-version --application-name $APPLICATION_NAME --version-label $VERSION_LABEL --source-bundle S3Bucket=elasticbeanstalk-us-east-1-xxxxxxxxxxxx,S3Key=$APPLICATION_NAME/$ARTIFACT
 
+    #- name: Update and deploy to Elastic Beanstalk environments
+     # run: |
+       #aws elasticbeanstalk update-environment --environment-name $APPLICATION_NAME-media-dev --version-label $VERSION_LABEL
+       #aws elasticbeanstalk update-environment --environment-name $APPLICATION_NAME-media-test --version-label $VERSION_LABEL
+       #aws elasticbeanstalk update-environment --environment-name $APPLICATION_NAME-media-staging --version-label $VERSION_LABEL
+      
     
