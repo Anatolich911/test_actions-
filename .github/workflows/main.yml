@@ -46,4 +46,4 @@ jobs:
       run: |
         aws elasticbeanstalk create-application-version --application-name $APPLICATION_NAME --version-label $VERSION_LABEL --source-bundle S3Bucket=elasticbeanstalk-us-east-1-xxxxxxxxxxxx,S3Key=${{ env.APPLICATION_NAME }}/$ARTIFACT
 
-    # Add additional AWS CLI commands to update the environment as needed
+    
