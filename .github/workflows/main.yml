@@ -39,8 +39,8 @@ jobs:
     - name: Set Version Label
       run: echo "VERSION_LABEL=$VERSION-$TIMESTAMP" >> $GITHUB_ENV
 
-    - name: Build with Maven
-      run: mvn clean package -Dartifact-version=$VERSION_LABEL
+    #- name: Build with Maven
+    #  run: mvn clean package -Dartifact-version=$VERSION_LABEL
 
 
     - name: Upload artifact to S3
