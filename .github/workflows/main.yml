@@ -8,50 +8,54 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permisions: 
+      id-token: write
+      contents: read
+      packages: read
 
     steps:
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1 # Replace with your AWS region
+      -name: Checkout
+      uses:actions/checkout@v4
 
-    - name: Checkout AWS CodeCommit Repository
-      run: |
-        git config --global credential.helper '!aws codecommit credential-helper $@'
-        git config --global credential.UseHttpPath true
-        git clone https://git-codecommit.us-east-1.amazonaws.com/v1/repos/sd
-        cd sd
+        #GH OpenIDConnect  
+      - name: Checkout AWS CodeCommit Repository
+        run: |
+          git config --global credential.helper '!aws codecommit credential-helper $@'
+          git config --global credential.UseHttpPath true
+          git clone https://git-codecommit.us-east-1.amazonaws.com/v1/repos/media-ws
+          cd media-ws
 
-    - name: Set up JDK 11
-      uses: actions/setup-java@v2
-      with:
-        java-version: '11'
-        distribution: 'adopt'
+      - name: Set up JDK 11
+        uses: actions/setup-java@v2
+        with:
+          java-version: '11'
+          distribution: 'adopt'
 
-    - name: Extract project version and set environment variables
-      run: |
-        VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-        TIMESTAMP=$(date +'%Y-%m-%d-%H.%M.%S')
-        VERSION_LABEL="$VERSION-$TIMESTAMP"
-        ARTIFACT="$VERSION_LABEL.war"
-        APPLICATION_NAME="media-ws" 
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
-        echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
-        echo "VERSION_LABEL=$VERSION_LABEL" >> $GITHUB_ENV
-        echo "ARTIFACT=$ARTIFACT" >> $GITHUB_ENV
-        echo "APPLICATION_NAME=$APPLICATION_NAME" >> $GITHUB_ENV
+      - name: Extract project version and set environment variables
+        run: |
+          echo "VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)"
 
-    #- name: Build with Maven
-    #  run: mvn clean package -Dartifact-mvt -Dversion.label=$VERSION_LABEL -P code-artifact-mvt
+      - name: Generate Timestamp 
+        run: |    
+          echo "TIMESTAMP=$(date +'%Y-%m-%d-%H.%M.%S')" >> $GITHUB_ENV
+          
+      - name: Set version label and app name
+        run: |    
+          echo "VERSION_LABEL="$VERSION-$TIMESTAMP" >> $GITHUB_ENV    
+          APPLICATION_NAME="media-ws" 
+          echo "APPLICATION_NAME=$APPLICATION_NAME" >> $GITHUB_ENV
+          ARTIFACT="$VERSION_LABEL.war"
+          echo "ARTIFACT=$ARTIFACT" >> $GITHUB_ENV
+
+      - name: Build with Maven
+        run: mvn clean package -P code-artifact-mvt -Dartifact-mvt -Dversion.label=$VERSION_LABEL -Denvironment=DEV "-DJDBC.url=jdbc:postgresql://dev-rds.private.hoopladigital.com:5432/dev?user=alexandria&password=trinity2ApplicationName=media-ws-deploy-jenkins"
 
 
-    - name: Upload artifact to S3
-      run: aws s3 cp target/$ARTIFACT s3://terraform-s3backend-anatolich911/$APPLICATION_NAME/
+      - name: Upload artifact to S3
+        run: aws s3 cp target/$ARTIFACT s3://elasicbeanstalk-us-east-1-054502987532/$APPLICATION_NAME/
 
-    #- name: Create Beanstalk Application Version
-    #  run: aws elasticbeanstalk create-application-version --application-name $APPLICATION_NAME --version-label $VERSION_LABEL --source-bundle S3Bucket=elasticbeanstalk-us-east-1-xxxxxxxxxxxx,S3Key=$APPLICATION_NAME/$ARTIFACT
+      - name: Create Beanstalk Application Version
+        run: aws elasticbeanstalk create-application-version --application-name $APPLICATION_NAME --version-label $VERSION_LABEL --source-bundle S3Bucket=elasticbeanstalk-us-east-1-xxxxxxxxxxxx,S3Key=$APPLICATION_NAME/$ARTIFACT
 
     #- name: Update and deploy to Elastic Beanstalk environments
      # run: |
