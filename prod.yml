@@ -1,0 +1,66 @@
+name: Build and Deploy to AWS EB prod
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on creating tags/release 
+  push:
+    tags: [ 'v*.*.*' ]
+    paths-ignore: [ "README.md", ".gitignore", ".github/**" ]
+
+  # # Allows you to run this workflow manually from the Actions tab
+  # workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+    permissions:
+      pull-requests: write
+      id-token: write
+      contents: read
+    env:
+      APPLICATION_NAME: media-ws
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+  
+      # GH Actions OpenIDConnect
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::058253789961:role/beanstalk-publish
+          aws-region: us-east-1
+     
+      # Runs a single command using the runners shell
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin' 
+
+      - name: Version setup
+        run: |
+          export SHA=$(echo "${{ github.sha }}" | cut -c 1-6)
+          echo "SHA=$SHA" >> $GITHUB_ENV
+          export VERSION=`cd media-ws && mvn -B org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep -Ev '(^\[|\w+:)'`
+          export TIMESTAMP=`date +"%Y-%m-%d-%H.%M.%S"`
+          export VERSION_LABEL="${VERSION}-${SHA}-${TIMESTAMP}"
+          echo "VERSION_LABEL=$VERSION_LABEL" >> "$GITHUB_ENV"
+
+      # - name: Build
+      #   run: mvn -B clean package -Dversion.label=$VERSION_LABEL -Denvironment=PROD
+
+      # - name: Deploy to Elastic Beanstalk
+      #   run: aws s3 cp $APPLICATION_NAME/target/${VERSION_LABEL}.war s3://elasticbeanstalk-us-east-1-058253789961/$APPLICATION_NAME/$APPLICATION_NAME-$VERSION_LABEL.war --region us-east-1
+        
+      # - name: Create Beanstalk App Versions 
+      #   run: aws elasticbeanstalk create-application-version --application-name $APPLICATION_NAME --version-label $VERSION_LABEL --source-bundle S3Bucket=elasticbeanstalk-us-east-1-058253789961,S3Key=$APPLICATION_NAME/$APPLICATION_NAME-$VERSION_LABEL.war --region us-east-1
+
+      # - name: Update and deploy to EB
+      #   run: aws elasticbeanstalk update-environment --environment-name ${APPLICATION_NAME} --application-name $APPLICATION_NAME --version-label $VERSION_LABEL --region us-east-1
