@@ -1,0 +1,47 @@
+name: pre-commit-2
+
+on:
+  pull_request:
+    branches:
+      - master
+env:
+  TF_TOKEN_app_terraform_io: ${{ secrets.TFE_TOKEN }}
+
+jobs:
+  preCommit:
+    name: pre-commit
+    runs-on: self-hosted
+    container:
+      image: ubuntu:latest
+    steps:
+      - name: Install dependencies
+        run: |
+          apt update
+          apt install -y python3 python3-pip curl wget
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{github.event.pull_request.head.repo.full_name}}
+
+      - name: Terraform min/max versions
+        id: minMax
+        uses: clowdhaus/terraform-min-max@v1.2.5
+
+      - name: set PY
+        run: echo "PY=$(python -VV | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit|${{ env.PY }}|${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Pre-commit Terraform ${{ steps.minMax.outputs.maxVersion }}
+        uses: clowdhaus/terraform-composite-actions/pre-commit@v1.8.3
+        with:
+          terraform-version: ${{ steps.minMax.outputs.maxVersion }}
+          terraform-docs-version: v0.16.0
+          install-hcledit: true
+          hcledit-version: 0.2.6
+          install-tfsec: true
+          args: "-c .github/.pre-commit-config-gh-action.yaml --all-files --source ${{ github.event.pull_request.base.sha }} --origin ${{ github.event.pull_request.head.sha }} --color always --show-diff-on-failure"
